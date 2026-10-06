@@ -121,6 +121,30 @@ pnpm dev
 
 > Supabaseは認証にのみ使用しています。畑マスタ・プロジェクト・個体・生育記録はサンプルデータで初期化し、メモリ上で管理しています。ページを再読み込みすると変更は初期データに戻ります。`localStorage` / `sessionStorage` は使いません。
 
+## GitHub ActionsによるVercelデプロイ
+
+`.github/workflows/deploy.yml` でGitHub ActionsからVercelへデプロイします。
+
+| ブランチ／イベント | 動作 |
+| --- | --- |
+| `develop` へのpush | Vercel Preview環境へデプロイ |
+| `main` へのpush | Vercel Production環境へデプロイ |
+| `develop` または `main` 向けPull Request | `pnpm build` のみ実行し、デプロイしない |
+
+### 初回設定
+
+1. VercelでこのGitHubリポジトリをプロジェクトとして登録し、Production Branchを `main` に設定します。
+2. Vercelのプロジェクト設定で `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY`（または `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`）をPreviewとProductionの両方に登録します。
+3. GitHubリポジトリの **Settings → Secrets and variables → Actions** に、次のRepository secretsを登録します。
+   - `VERCEL_TOKEN`: VercelのAccount Settingsで発行したアクセストークン
+   - `VERCEL_ORG_ID`: Vercelチーム／アカウントID
+   - `VERCEL_PROJECT_ID`: VercelプロジェクトID
+4. `develop` と `main` ブランチをGitHubに作成し、`develop` にpushしてPreviewデプロイを確認します。問題なければPull Requestを作成して `main` にマージします。
+
+`VERCEL_ORG_ID` と `VERCEL_PROJECT_ID` は、Vercel CLIで対象プロジェクトにリンクしたときに作成される `.vercel/project.json` から確認できます。`.vercel` ディレクトリはGitにコミットせず、値はGitHub Secretsへ登録してください。ワークフロー実行後はGitHubの **Actions** で各ステップとデプロイ結果を確認できます。
+
+GitHub ActionsとVercelのGit連携による二重デプロイを避けるため、Vercel側のGit自動デプロイを無効化するか、VercelのGit設定で自動デプロイを無効にしてください。Supabaseの公開キーはVercelの環境変数として登録し、`service_role` キーはブラウザー向け環境変数に設定しないでください。
+
 ### 農業データ用テーブル定義（将来のSupabase連携用）
 
 `supabase/schema.sql` は、農業データをSupabaseで管理するときにSQL Editorから一括実行する初期スキーマです。現状のアプリは引き続きインメモリ管理であり、このSQLを実行してもアプリが自動的にSupabaseへ読み書きするようにはなりません。

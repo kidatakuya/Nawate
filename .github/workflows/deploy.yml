@@ -1,0 +1,81 @@
+name: Build and deploy
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.3.4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build pull request
+        if: github.event_name == 'pull_request'
+        run: pnpm build
+
+      - name: Pull Vercel environment
+        if: github.event_name == 'push'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          else
+            pnpm dlx vercel@latest pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          fi
+
+      - name: Build for Vercel
+        if: github.event_name == 'push'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
+          else
+            pnpm dlx vercel@latest build --token="$VERCEL_TOKEN"
+          fi
+
+      - name: Deploy to Vercel
+        if: github.event_name == 'push'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          else
+            pnpm dlx vercel@latest deploy --prebuilt --token="$VERCEL_TOKEN"
+          fi

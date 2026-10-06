@@ -1,8 +1,6 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Noto_Sans_JP } from 'next/font/google'
-import { AppHeader } from '@/components/farm/app-header'
-import { FarmProvider } from '@/components/farm/farm-provider'
 import './globals.css'
 
 const notoSansJp = Noto_Sans_JP({
@@ -41,10 +39,7 @@ export default function RootLayout({
   return (
     <html lang="ja" className={notoSansJp.variable}>
       <body className="min-h-dvh antialiased">
-        <FarmProvider>
-          <AppHeader />
-          <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
-        </FarmProvider>
+        {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

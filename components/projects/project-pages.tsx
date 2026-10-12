@@ -225,7 +225,7 @@ function FieldConfigEditor({ projectId, fieldId, config }: { projectId: string; 
     if (applyFieldConfig(projectId, fieldId, values)) setMessage('畑の構成を適用しました。')
   }
   return <form onSubmit={submit} className="mb-4 rounded-xl border bg-card p-4 print:hidden">
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {([
         ['ridgeCount', '畝数', FIELD_LIMITS.ridgeCount.max],
         ['rowCountPerRidge', '1畝あたりの列数', FIELD_LIMITS.rowCountPerRidge.max],
@@ -335,7 +335,7 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
                     <Button type="button" variant="outline" disabled={!bulkStatus || !bulkEligiblePlants.length} onClick={applyBulkStatus}>枯死以外の{bulkEligiblePlants.length}個体に適用</Button>
                     <p className="basis-full text-xs text-muted-foreground">枯死した個体は一括変更の対象外です。個体を選択して個別に変更してください。</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">{rowPlants.map((plant) => <button key={plant.id} type="button" onClick={() => updateLocation({ plant: plant.id })} className={cn('rounded-xl border p-3 text-left transition-shadow hover:shadow-md', STATUS_CLASSES[plant.status], plant.status === 'growing' || plant.status === 'harvested' || plant.status === 'withered' ? 'text-white' : 'text-foreground')}><span className="block font-semibold">{field.name} / 畝{plant.ridgeNumber} / 列{plant.rowNumber} / {plant.plantNumber}番</span><span className="mt-1 block text-xs">{plant.cropName ?? project.cropName} ・ {CROP_STATUS_LABELS[plant.status]}</span></button>)}</div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">{rowPlants.map((plant) => <button key={plant.id} type="button" onClick={() => updateLocation({ plant: plant.id })} className={cn('min-h-16 rounded-xl border p-3 text-left transition-shadow hover:shadow-md', STATUS_CLASSES[plant.status], plant.status === 'growing' || plant.status === 'harvested' || plant.status === 'withered' ? 'text-white' : 'text-foreground')}><span className="block break-words font-semibold">{field.name} / 畝{plant.ridgeNumber} / 列{plant.rowNumber} / {plant.plantNumber}番</span><span className="mt-1 block text-xs">{plant.cropName ?? project.cropName} ・ {CROP_STATUS_LABELS[plant.status]}</span></button>)}</div>
                 </div>
               })()}
             </>}

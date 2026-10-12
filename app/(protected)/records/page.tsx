@@ -1,8 +1,8 @@
-import type { Metadata } from 'next'
-import { RecordsPage } from '@/components/projects/project-pages'
+import type { Metadata } from "next";
+import { RecordsPage } from "@/components/projects/project-pages";
 
-export const metadata: Metadata = { title: '生育記録 | 畑ノート' }
+export const metadata: Metadata = { title: "生育記録 | Nawate" };
 
 export default function Page() {
-  return <RecordsPage />
+  return <RecordsPage />;
 }

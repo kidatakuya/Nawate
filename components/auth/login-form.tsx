@@ -60,7 +60,7 @@ export function LoginForm({
           <span className="mb-2 flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <Sprout className="size-6" aria-hidden="true" />
           </span>
-          <CardTitle className="text-2xl font-bold">畑ノート</CardTitle>
+          <CardTitle className="text-2xl font-bold">Nawate</CardTitle>
           <CardDescription>
             管理者アカウントでログインしてください
           </CardDescription>

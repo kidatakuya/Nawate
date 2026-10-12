@@ -1,6 +1,6 @@
-# 畑ノート
+# Nawate
 
-畑ノートは、畑を場所のマスタとして管理し、「プロジェクト」単位で作物の栽培、畑の割り当て、個体の生育記録を扱う日本語の農業管理アプリです。現在のデータはReactのContext + `useReducer`でインメモリ管理し、ブラウザーのストレージやSupabaseへの農業データ保存は行いません。
+Nawateは、畑を場所のマスタとして管理し、「プロジェクト」単位で作物の栽培、畑の割り当て、個体の生育記録を扱う日本語の農業管理アプリです。現在のデータはReactのContext + `useReducer`でインメモリ管理し、ブラウザーのストレージやSupabaseへの農業データ保存は行いません。
 
 ## 主な機能
 
@@ -125,10 +125,10 @@ pnpm dev
 
 `.github/workflows/deploy.yml` でGitHub ActionsからVercelへデプロイします。
 
-| ブランチ／イベント | 動作 |
-| --- | --- |
-| `develop` へのpush | Vercel Preview環境へデプロイ |
-| `main` へのpush | Vercel Production環境へデプロイ |
+| ブランチ／イベント                       | 動作                                    |
+| ---------------------------------------- | --------------------------------------- |
+| `develop` へのpush                       | Vercel Preview環境へデプロイ            |
+| `main` へのpush                          | Vercel Production環境へデプロイ         |
 | `develop` または `main` 向けPull Request | `pnpm build` のみ実行し、デプロイしない |
 
 ### 初回設定
@@ -144,6 +144,12 @@ pnpm dev
 `VERCEL_ORG_ID` と `VERCEL_PROJECT_ID` は、Vercel CLIで対象プロジェクトにリンクしたときに作成される `.vercel/project.json` から確認できます。`.vercel` ディレクトリはGitにコミットせず、値はGitHub Secretsへ登録してください。ワークフロー実行後はGitHubの **Actions** で各ステップとデプロイ結果を確認できます。
 
 GitHub ActionsとVercelのGit連携による二重デプロイを避けるため、Vercel側のGit自動デプロイを無効化するか、VercelのGit設定で自動デプロイを無効にしてください。Supabaseの公開キーはVercelの環境変数として登録し、`service_role` キーはブラウザー向け環境変数に設定しないでください。
+
+## スマートフォン・PWA
+
+画面はスマートフォン幅に合わせたレスポンシブレイアウトで、ナビゲーションは横スクロール、畑構成フォームと個体一覧は小さい画面で縦並びになります。Next.js App Routerのリンク遷移を使っており、ページ遷移時に全体を再読み込みしないSPA風ナビゲーションが有効です。
+
+`app/manifest.ts` はアプリ名・起動URL・standalone表示・テーマ色を定義します。HTTPSで公開後、対応ブラウザーの共有／メニューからホーム画面へ追加できます。認証が必要な農業データを端末に残さないため、Service Workerによるオフラインキャッシュは設定していません。また、データ保存自体がインメモリのため、オフライン対応・再起動後のデータ保持はありません。
 
 ### 農業データ用テーブル定義（将来のSupabase連携用）
 

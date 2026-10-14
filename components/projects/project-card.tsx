@@ -7,12 +7,14 @@ import type { Project } from '@/lib/types'
 export function ProjectCard({
   project,
   fieldCount,
+  fieldNames,
   totalPlants,
   usedPlants,
   href,
 }: {
   project: Project
   fieldCount: number
+  fieldNames?: string[]
   totalPlants?: number
   usedPlants?: number
   href?: string
@@ -34,7 +36,7 @@ export function ProjectCard({
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><MapPin className="size-4" />畑 {fieldCount}</span>
+            <span className="inline-flex items-center gap-1"><MapPin className="size-4" />{fieldNames?.length ? fieldNames.join('・') : `畑 ${fieldCount}`}</span>
             <span className="inline-flex items-center gap-1"><CalendarDays className="size-4" />{formatDate(project.startDate)} – {project.endDate ? formatDate(project.endDate) : '進行中'}</span>
             {totalPlants !== undefined && <span className="inline-flex items-center gap-1"><Sprout className="size-4" />個体 {usedPlants ?? 0} / {totalPlants}</span>}
           </div>

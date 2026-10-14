@@ -1,25 +1,57 @@
-import type { AppState, CropStatus, Plant } from '@/lib/types'
+import type { AppState, CropStatus, Plant, Project, ProjectFieldConfig } from '@/lib/types'
 
-const fieldMasters = [
-  { id: 'field-east', name: '東の畑' },
-  { id: 'field-greenhouse', name: '南のハウス' },
-  { id: 'field-north', name: '北の畑' },
+const blankSoilWork = {
+  baseFertilizers: [],
+  topDressings: [],
+  sowing: '',
+  sowingDate: '',
+  note: '',
+}
+
+const projects: Project[] = [
+  {
+    id: 'project-tomato-2026',
+    name: '2026年春トマト',
+    year: 2026,
+    cropName: 'トマト',
+    fieldIds: ['east', 'west'],
+    startDate: '2026-03-15',
+    endDate: null,
+    soilWork: { ...blankSoilWork, baseFertilizers: [{ name: '完熟堆肥・有機配合肥料', date: '2026-03-08', amount: '畝全体に施用', note: '' }], sowing: 'トマト苗', sowingDate: '2026-03-15' },
+    createdAt: '2026-03-01T09:00:00.000Z',
+  },
+  {
+    id: 'project-lettuce-2026',
+    name: '2026年秋レタス',
+    year: 2026,
+    cropName: 'レタス',
+    fieldIds: ['north'],
+    startDate: '2026-08-20',
+    endDate: null,
+    soilWork: { ...blankSoilWork, baseFertilizers: [{ name: '完熟堆肥・有機肥料', date: '2026-08-10', amount: '', note: '' }] },
+    createdAt: '2026-08-01T09:00:00.000Z',
+  },
+  {
+    id: 'project-cucumber-2025',
+    name: '2025年夏キュウリ',
+    year: 2025,
+    cropName: 'キュウリ',
+    fieldIds: ['east'],
+    startDate: '2025-04-10',
+    endDate: '2025-09-25',
+    soilWork: { ...blankSoilWork, baseFertilizers: [{ name: '完熟堆肥・有機肥料', date: '2025-04-05', amount: '', note: '' }] },
+    createdAt: '2025-04-01T09:00:00.000Z',
+  },
 ]
 
-const projects = [
-  { id: 'project-tomato-2026', name: '2026年春トマト', year: 2026, cropName: 'トマト', fieldIds: ['field-east', 'field-greenhouse'], startDate: '2026-03-15', endDate: null, createdAt: '2026-03-01T09:00:00.000Z' },
-  { id: 'project-lettuce-2026', name: '2026年秋レタス', year: 2026, cropName: 'レタス', fieldIds: ['field-north'], startDate: '2026-08-20', endDate: null, createdAt: '2026-08-01T09:00:00.000Z' },
-  { id: 'project-cucumber-2025', name: '2025年夏キュウリ', year: 2025, cropName: 'キュウリ', fieldIds: ['field-east'], startDate: '2025-04-10', endDate: '2025-09-25', createdAt: '2025-04-01T09:00:00.000Z' },
+const projectFieldConfigs: ProjectFieldConfig[] = [
+  { id: 'config-tomato-east', projectId: 'project-tomato-2026', fieldId: 'east', ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
+  { id: 'config-tomato-west', projectId: 'project-tomato-2026', fieldId: 'west', ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 6 },
+  { id: 'config-lettuce-north', projectId: 'project-lettuce-2026', fieldId: 'north', ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
+  { id: 'config-cucumber-east', projectId: 'project-cucumber-2025', fieldId: 'east', ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 5 },
 ]
 
-const projectFieldConfigs = [
-  { id: 'config-tomato-east', projectId: 'project-tomato-2026', fieldId: 'field-east', ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
-  { id: 'config-tomato-house', projectId: 'project-tomato-2026', fieldId: 'field-greenhouse', ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 6 },
-  { id: 'config-lettuce-north', projectId: 'project-lettuce-2026', fieldId: 'field-north', ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
-  { id: 'config-cucumber-east', projectId: 'project-cucumber-2025', fieldId: 'field-east', ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 5 },
-]
-
-const statusFor = (projectId: string, ridge: number, row: number, number: number): CropStatus => {
+function initialStatus(projectId: string, ridge: number, row: number, number: number): CropStatus {
   if (projectId === 'project-tomato-2026') {
     if (ridge === 1 && number <= 2) return 'harvested'
     if (ridge === 2) return row === 1 ? 'flowering' : 'growing'
@@ -42,7 +74,7 @@ for (const config of projectFieldConfigs) {
   for (let ridgeNumber = 1; ridgeNumber <= config.ridgeCount; ridgeNumber += 1) {
     for (let rowNumber = 1; rowNumber <= config.rowCountPerRidge; rowNumber += 1) {
       for (let plantNumber = 1; plantNumber <= config.plantCountPerRow; plantNumber += 1) {
-        const status = statusFor(project.id, ridgeNumber, rowNumber, plantNumber)
+        const status = initialStatus(project.id, ridgeNumber, rowNumber, plantNumber)
         const id = `seed-plant-${++plantCounter}`
         plants.push({
           id,
@@ -70,4 +102,4 @@ for (const config of projectFieldConfigs) {
   }
 }
 
-export const initialState: AppState = { fieldMasters, projects, projectFieldConfigs, plants, records }
+export const initialState: AppState = { projects, projectFieldConfigs, plants, records }

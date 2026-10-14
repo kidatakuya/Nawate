@@ -1,4 +1,4 @@
-import type { AppAction, AppState, Plant } from '@/lib/types'
+import type { AppAction, AppState, FieldType, Plant } from '@/lib/types'
 import { generateId } from '@/lib/farm-utils'
 
 type Dimensions = { ridgeCount: number; rowCountPerRidge: number; plantCountPerRow: number }
@@ -11,9 +11,9 @@ export function plantsRemovedByConfig(plants: Plant[], config: Dimensions): Plan
   ))
 }
 
-function createPlants(projectId: string, fieldId: string, config: Dimensions, previous: Plant[]): Plant[] {
+export function generatePlantsForConfig(projectId: string, fieldId: FieldType, config: Dimensions, previous: Plant[]): Plant[] {
   const retained = new Map(
-    previous.filter((plant) => plant.status !== 'empty').map((plant) => [
+    previous.map((plant) => [
       `${plant.ridgeNumber}:${plant.rowNumber}:${plant.plantNumber}`,
       plant,
     ]),
@@ -40,25 +40,23 @@ function createPlants(projectId: string, fieldId: string, config: Dimensions, pr
   return plants
 }
 
+export function updatePlantsFromRecord(plants: Plant[], plantId: string, status: Plant['status'], defaultCropName: string | null): Plant[] {
+  return plants.map((plant) => plant.id === plantId
+    ? { ...plant, status, cropName: plant.cropName ?? defaultCropName }
+    : plant)
+}
+
 export function farmReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case 'field/add':
-      return { ...state, fieldMasters: [...state.fieldMasters, action.payload] }
-    case 'field/delete': {
-      const id = action.payload.id
-      if (state.projects.some((project) => project.endDate === null && project.fieldIds.includes(id))) return state
-      const removedIds = new Set(state.plants.filter((plant) => plant.fieldId === id).map((plant) => plant.id))
-      return {
-        ...state,
-        fieldMasters: state.fieldMasters.filter((field) => field.id !== id),
-        projects: state.projects.map((project) => ({ ...project, fieldIds: project.fieldIds.filter((fieldId) => fieldId !== id) })),
-        projectFieldConfigs: state.projectFieldConfigs.filter((config) => config.fieldId !== id),
-        plants: state.plants.filter((plant) => plant.fieldId !== id),
-        records: state.records.filter((record) => !removedIds.has(record.plantId)),
-      }
-    }
     case 'project/add':
       return { ...state, projects: [...state.projects, action.payload] }
+    case 'project/update':
+      return {
+        ...state,
+        projects: state.projects.map((project) => project.id === action.payload.id
+          ? { ...project, ...action.payload.changes }
+          : project),
+      }
     case 'project/delete': {
       const id = action.payload.id
       const removedIds = new Set(state.plants.filter((plant) => plant.projectId === id).map((plant) => plant.id))
@@ -74,6 +72,13 @@ export function farmReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         projects: state.projects.map((project) => project.id === action.payload.id ? { ...project, endDate: action.payload.endDate } : project),
+      }
+    case 'project/soil-work-update':
+      return {
+        ...state,
+        projects: state.projects.map((project) => project.id === action.payload.id
+          ? { ...project, soilWork: action.payload.soilWork }
+          : project),
       }
     case 'config/apply': {
       const { projectId, fieldId, config } = action.payload
@@ -100,7 +105,7 @@ export function farmReducer(state: AppState, action: AppAction): AppState {
         ],
         plants: [
           ...state.plants.filter((plant) => plant.projectId !== projectId || plant.fieldId !== fieldId),
-          ...createPlants(projectId, fieldId, config, previous),
+          ...generatePlantsForConfig(projectId, fieldId, config, previous),
         ],
         records: state.records.filter((record) => !removedIds.has(record.plantId)),
       }
@@ -115,13 +120,12 @@ export function farmReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         records: [...state.records, action.payload],
-        plants: state.plants.map((plant) => plant.id === action.payload.plantId
-          ? {
-              ...plant,
-              status: action.payload.status,
-              cropName: plant.cropName ?? state.projects.find((project) => project.id === action.payload.projectId)?.cropName ?? null,
-            }
-          : plant),
+        plants: updatePlantsFromRecord(
+          state.plants,
+          action.payload.plantId,
+          action.payload.status,
+          state.projects.find((project) => project.id === action.payload.projectId)?.cropName ?? null,
+        ),
       }
     case 'record/delete':
       return { ...state, records: state.records.filter((record) => record.id !== action.payload.id) }

@@ -6,7 +6,6 @@ import { Suspense } from "react";
 import {
   ClipboardList,
   LayoutDashboard,
-  MapIcon,
   Sprout,
   FolderKanban,
 } from "lucide-react";
@@ -18,7 +17,6 @@ import { ProjectHierarchyNav } from "./project-hierarchy-nav";
 const NAV_ITEMS = [
   { href: "/", label: "ダッシュボード", icon: LayoutDashboard },
   { href: "/projects", label: "プロジェクト", icon: FolderKanban },
-  { href: "/fields", label: "畑マスタ", icon: MapIcon },
   { href: "/records", label: "生育記録", icon: ClipboardList },
 ] as const;
 

@@ -158,7 +158,9 @@ GitHub ActionsとVercelのGit連携による二重デプロイを避けるため
 
 ### 農業データの保存と将来のバックエンド連携
 
-現在の画面は `useAppState` と `useReducer` により、`Project`、`ProjectFieldConfig`、`Plant`、`GrowthRecord` をメモリ内で管理します。畑は `constants/fields.ts` の固定選択肢であり、土づくり情報はプロジェクトの `soilWork` にまとめ、元肥・追肥を複数件の肥料情報として管理します。`lib/supabase.ts` には型付きの取得・作成・更新・削除関数を用意していますが、現在の画面状態はまだSupabaseへ保存せず、ページ再読み込み時に初期サンプルデータへ戻ります。Supabase API関数を使う場合は `NEXT_PUBLIC_SUPABASE_URL` と公開キーを設定してください。`supabase/schema.sql` は以前のデータモデル向けの設計資料であり、実データ連携を有効にする際には現在の型定義に合わせて見直してください。
+現在の画面は `useAppState` と `useReducer` により、`Project`、`ProjectFieldConfig`、`Plant`、`GrowthRecord` をメモリ内で管理します。畑は `constants/fields.ts` の固定選択肢であり、土づくり情報はプロジェクトの `soilWork` にまとめ、元肥・追肥を複数件の肥料情報として管理します。`lib/supabase.ts` には型付きの取得・作成・更新・削除関数を用意していますが、現在の画面状態はまだSupabaseへ保存せず、ページ再読み込み時に初期サンプルデータへ戻ります。Supabase API関数を使う場合は `NEXT_PUBLIC_SUPABASE_URL` と公開キーを設定してください。
+
+`supabase/schema.sql` は現在のモデルに対応する初期スキーマです。`projects.field_ids` は畑Enum値の配列、`projects.soil_work` は元肥・追肥リストを含むJSONBです。`project_field_configs` はプロジェクトと畑の組ごとに構成を保持し、`plants` はプロジェクト・畑・畝・列・番号で一意になります。生育記録は個体に外部キーで紐づき、プロジェクト／構成／個体の削除時に関連データがカスケード削除されます。畑マスタテーブルは作成しません。SQL Editorではこのスキーマを新規データベースに適用してください。既存の旧スキーマを移行する場合は、データを保全する個別のマイグレーションを作成し、初期スキーマをそのまま再実行しないでください。
 
 ## 開発サーバーの起動
 

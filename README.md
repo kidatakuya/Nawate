@@ -1,6 +1,6 @@
 # Nawate
 
-Nawateは、プロジェクトごとに作物・畑の構成・個体の生育記録を管理する日本語の農業管理アプリです。畑は `constants/fields.ts` の固定選択肢で管理します。ローカル開発とVercel Previewではサンプルデータを使うモックAPI、本番環境ではSupabase APIに接続します。
+Nawateは、プロジェクトごとに作物・畑の構成・個体の生育記録を管理する日本語の農業管理アプリです。畑は `src/constants/fields.ts` の固定選択肢で管理します。ローカル開発とVercel Previewではサンプルデータを使うモックAPI、本番環境ではSupabase APIに接続します。
 
 ## 主な機能
 
@@ -49,34 +49,30 @@ Nawateは、プロジェクトごとに作物・畑の構成・個体の生育�
 
 ```text
 .
-├─ app/
-│  ├─ (protected)/      # ログイン必須の画面と認証チェック
-│  │  ├─ projects/      # プロジェクト一覧・作成・詳細
-│  │  ├─ records/       # 終了プロジェクトの振り返り
-│  │  └─ page.tsx       # ダッシュボード
-│  ├─ (public)/         # ログイン不要の画面
-│  │  └─ login/         # ログイン画面
-│  └─ layout.tsx        # 全画面共通レイアウト
-├─ components/
-│  ├─ projects/         # プロジェクト中心の画面・カード
-│  └─ farm/             # 共通Providerとヘッダー
-├─ constants/           # 畑の固定選択肢
-├─ types/               # FieldType、CropStatus、エンティティ型
-├─ schemas/             # Project、Plant、GrowthRecord、SoilWork のZodスキーマ
-├─ hooks/               # useAppState と各エンティティ操作フック
-├─ lib/                 # Reducer、サンプルデータ、Supabase API、ユーティリティ
-├─ __tests__/           # スキーマ・純粋関数のJestテスト
+├─ src/
+│  ├─ app/              # App Router、ページ、レイアウト、スタイル
+│  ├─ components/       # UI、農場・プロジェクトコンポーネント
+│  ├─ constants/        # 畑の固定選択肢
+│  ├─ hooks/            # useAppState と各エンティティ操作フック
+│  ├─ lib/              # Reducer、API、サンプルデータ、ユーティリティ
+│  ├─ schemas/          # 各エンティティのZodスキーマ
+│  ├─ types/            # FieldType、CropStatus、エンティティ型
+│  ├─ __tests__/        # Jestテスト
+│  └─ proxy.ts          # 認証セッションの更新とルート保護
 ├─ public/              # 画像やアイコンなどの静的ファイル
+├─ supabase/            # DBスキーマとSupabase関連ファイル
+├─ .github/             # CI/CDワークフロー
 ├─ package.json         # プロジェクト設定と依存関係
 ├─ pnpm-lock.yaml       # pnpm ロックファイル
 ├─ next.config.mjs      # Next.js 設定
-├─ tsconfig.json        # TypeScript 設定
+├─ tsconfig.json        # TypeScript 設定と src 用エイリアス
+├─ jest.config.cjs      # Jest 設定
 ├─ postcss.config.mjs   # PostCSS 設定
 ├─ components.json      # UI コンポーネント設定
 └─ README.md            # このファイル
 ```
 
-`(protected)` と `(public)` はNext.jsのルートグループです。括弧内の名前はURLに含まれません。保護画面は `(protected)/layout.tsx` で認証状態を確認し、`proxy.ts` でセッションを更新します。
+`(protected)` と `(public)` はNext.jsのルートグループです。括弧内の名前はURLに含まれません。保護画面は `src/app/(protected)/layout.tsx` で認証状態を確認し、`src/proxy.ts` でセッションを更新します。
 
 ## セットアップ
 
@@ -108,7 +104,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=ここにanon_key
 
 新しいSupabaseプロジェクトでpublishable keyを使う場合は、`NEXT_PUBLIC_SUPABASE_ANON_KEY` の代わりに `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` という名前で設定できます。
 
-コード側で参照する場所は `lib/supabase/client.ts`、`lib/supabase/server.ts`、`proxy.ts` です。通常はコードを変更せず、`.env.local` の値だけを設定してください。環境変数を変更したら開発サーバーを再起動します。
+コード側で参照する場所は `src/lib/supabase/client.ts`、`src/lib/supabase/server.ts`、`src/proxy.ts` です。通常はコードを変更せず、`.env.local` の値だけを設定してください。環境変数を変更したら開発サーバーを再起動します。
 
 本番データベースには、SupabaseのSQL Editorで [`supabase/schema.sql`](./supabase/schema.sql) を実行してテーブルとRLSポリシーを作成してください。ローカル開発とPreviewはモックAPIを使うため、農業データ用のテーブル設定は不要です。
 
@@ -128,7 +124,7 @@ pnpm dev
 
 本番環境にデプロイする場合も、ホスティング先の環境変数設定にProject URLとどちらか一方の公開キーを登録してください。キーをソースコードへ直接書いたり、`service_role` / secret keyをブラウザー向けの環境変数に設定したりしないでください。
 
-ローカル開発とPreviewは `lib/mock-farm-api.ts` のモックAPIを使い、画面操作中はメモリ上でサンプルデータを更新します。ページを再読み込みすると初期サンプルデータに戻ります。本番環境は `VERCEL_ENV=production`（またはVercel以外の本番起動）でSupabase APIを使い、プロジェクト・畑構成・個体・生育記録をデータベースへ保存します。APIの読み込み・保存に失敗した場合は画面にエラーを表示します。
+ローカル開発とPreviewは `src/lib/mock-farm-api.ts` のモックAPIを使い、画面操作中はメモリ上でサンプルデータを更新します。ページを再読み込みすると初期サンプルデータに戻ります。本番環境は `VERCEL_ENV=production`（またはVercel以外の本番起動）でSupabase APIを使い、プロジェクト・畑構成・個体・生育記録をデータベースへ保存します。APIの読み込み・保存に失敗した場合は画面にエラーを表示します。
 
 ## GitHub ActionsによるVercelデプロイ
 
@@ -158,11 +154,11 @@ GitHub ActionsとVercelのGit連携による二重デプロイを避けるため
 
 画面はスマートフォン幅に合わせたレスポンシブレイアウトで、ナビゲーションは横スクロール、畑構成フォームと個体一覧は小さい画面で縦並びになります。Next.js App Routerのリンク遷移を使っており、ページ遷移時に全体を再読み込みしないSPA風ナビゲーションが有効です。
 
-`app/manifest.ts` はアプリ名・起動URL・standalone表示・テーマ色を定義します。HTTPSで公開後、対応ブラウザーの共有／メニューからホーム画面へ追加できます。認証が必要な農業データを端末に残さないため、Service Workerによるオフラインキャッシュは設定していません。農業データAPIを利用するにはオンライン接続が必要です。
+`src/app/manifest.ts` はアプリ名・起動URL・standalone表示・テーマ色を定義します。HTTPSで公開後、対応ブラウザーの共有／メニューからホーム画面へ追加できます。認証が必要な農業データを端末に残さないため、Service Workerによるオフラインキャッシュは設定していません。農業データAPIを利用するにはオンライン接続が必要です。
 
 ### 農業データのAPI接続
 
-画面状態は `useAppState` と `useReducer` で管理し、`FarmProvider` がモックAPIまたはSupabase APIと同期します。ローカル開発とVercel Previewでは `Project`、`ProjectFieldConfig`、`Plant`、`GrowthRecord` をモックデータ上で操作し、再読み込み時に初期サンプルデータへ戻します。Vercel Productionおよび本番起動では `lib/supabase.ts` がSupabaseから全データを読み込み、変更を保存します。本番データベースは空の状態から始まるため、必要な初期プロジェクトはProduction上で作成してください。土づくり情報はプロジェクトの `soilWork` に保持します。
+画面状態は `src/hooks/use-app-state.ts` と `useReducer` で管理し、`FarmProvider` がモックAPIまたはSupabase APIと同期します。ローカル開発とVercel Previewでは `Project`、`ProjectFieldConfig`、`Plant`、`GrowthRecord` をモックデータ上で操作し、再読み込み時に初期サンプルデータへ戻します。Vercel Productionおよび本番起動では `src/lib/supabase.ts` がSupabaseから全データを読み込み、変更を保存します。本番データベースは空の状態から始まるため、必要な初期プロジェクトはProduction上で作成してください。土づくり情報はプロジェクトの `soilWork` に保持します。
 
 `supabase/schema.sql` は現在のモデルに対応する初期スキーマです。`projects.field_ids` は畑Enum値の配列、`projects.soil_work` は全畑共通または畑別の元肥・追肥を含むJSONBです。`project_field_configs` はプロジェクトと畑の組ごとに構成を保持し、`plants` はプロジェクト・畑・畝・列・番号で一意になります。生育記録は個体に外部キーで紐づき、プロジェクト／構成／個体の削除時に関連データがカスケード削除されます。畑マスタテーブルは作成しません。SQL Editorではこのスキーマを新規データベースに適用してください。既存の旧スキーマを移行する場合は、データを保全する個別のマイグレーションを作成し、初期スキーマをそのまま再実行しないでください。
 

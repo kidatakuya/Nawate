@@ -137,7 +137,7 @@ export function DashboardPage() {
                         const row = rowIndex + 1
                         const rowPlants = fieldPlants.filter((plant) => plant.ridgeNumber === ridge && plant.rowNumber === row)
                         const dominant = (['withered', 'harvested', 'flowering', 'growing', 'sprouted', 'empty'] as CropStatus[]).find((status) => rowPlants.some((plant) => plant.status === status)) ?? 'empty'
-                        return <Link key={row} href={`/projects/${project.id}?field=${field.value}&ridge=${ridge}&row=${row}`} aria-label={`畝${ridge} 列${row}の個体を表示`} className="print:hidden flex min-w-12 flex-col items-center gap-2 rounded-md border bg-muted/40 px-2 py-2 hover:ring-2 hover:ring-primary">
+                        return <Link key={row} href={`/projects/${project.id}?field=${field.value}&ridge=${ridge}&row=${row}`} aria-label={`畝${ridge} 列${row}の個体を表示`} className="print:hidden relative flex min-w-12 flex-col items-center gap-2 rounded-md border bg-muted/40 px-2 py-2 hover:ring-2 hover:ring-primary">
                           <span className="text-sm font-semibold text-muted-foreground">列{row}</span>
                           <span className="flex flex-col items-center gap-1">{rowPlants.map((plant) => <span key={plant.id} className={cn('size-2.5 rounded-full', STATUS_CLASSES[plant.status])} />)}</span>
                           <span className="sr-only">{CROP_STATUS_LABELS[dominant]}</span>

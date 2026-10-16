@@ -1,56 +1,85 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { createRecordSchema, growthRecordSchema } from '@/schemas/record'
 import { createProjectSchema, projectSchema } from '@/schemas/project'
 import { plantSchema, updatePlantSchema } from '@/schemas/plant'
+import { projectFieldConfigSchema } from '@/schemas/fieldConfig'
+import { soilWorkSchema } from '@/schemas/soilWork'
 import type { CreateProjectInput } from '@/schemas/project'
 import type { CreateRecordInput } from '@/schemas/record'
-import type { GrowthRecord, Plant, Project } from '@/types/models'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-export const supabase: SupabaseClient | null = supabaseUrl && supabaseKey
-  ? createClient(supabaseUrl, supabaseKey)
-  : null
+import type { AppState } from '@/lib/types'
+import { FieldType } from '@/types/enums'
+import type { GrowthRecord, Plant, Project, ProjectFieldConfig } from '@/types/models'
+import { z } from 'zod'
 
 function getClient(): SupabaseClient {
-  if (!supabase) {
-    throw new Error('Supabaseの接続情報が設定されていません。')
+  return createClient()
+}
+
+const projectRowSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  year: z.number(),
+  crop_name: z.string(),
+  field_ids: z.array(z.nativeEnum(FieldType)),
+  start_date: z.string(),
+  end_date: z.string().nullable(),
+  soil_work: soilWorkSchema,
+  created_at: z.string(),
+})
+
+const projectFieldConfigRowSchema = z.object({
+  id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  field_id: z.nativeEnum(FieldType),
+  ridge_count: z.number(),
+  row_count_per_ridge: z.number(),
+  plant_count_per_row: z.number(),
+})
+
+const plantRowSchema = z.object({
+  id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  field_id: z.nativeEnum(FieldType),
+  ridge_number: z.number(),
+  row_number: z.number(),
+  plant_number: z.number(),
+  crop_name: z.string().nullable(),
+  planted_at: z.string().nullable(),
+  status: z.enum(['empty', 'sprouted', 'growing', 'flowering', 'harvested', 'withered']),
+})
+
+const growthRecordRowSchema = z.object({
+  id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  plant_id: z.string().uuid(),
+  recorded_at: z.string(),
+  status: z.enum(['sprouted', 'growing', 'flowering', 'harvested', 'withered']),
+  note: z.string(),
+})
+
+type ProjectRow = z.infer<typeof projectRowSchema>
+type PlantRow = z.infer<typeof plantRowSchema>
+type ProjectFieldConfigRow = z.infer<typeof projectFieldConfigRowSchema>
+type GrowthRecordRow = z.infer<typeof growthRecordRowSchema>
+
+type FarmTable = 'projects' | 'project_field_configs' | 'plants' | 'growth_records'
+
+function throwOnError(error: { message: string } | null, operation: string): void {
+  if (error) throw new Error(`Supabaseへの${operation}に失敗しました: ${error.message}`)
+}
+
+async function fetchAllRows(client: SupabaseClient, table: FarmTable): Promise<unknown[]> {
+  const rows: unknown[] = []
+  const pageSize = 1000
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await client.from(table).select('*').order('id').range(offset, offset + pageSize - 1)
+    throwOnError(error, `${table}の取得`)
+    const page = data ?? []
+    rows.push(...page)
+    if (page.length < pageSize) return rows
   }
-  return supabase
-}
-
-type ProjectRow = {
-  id: string
-  name: string
-  year: number
-  crop_name: string
-  field_ids: string[]
-  start_date: string
-  end_date: string | null
-  soil_work: Project['soilWork']
-  created_at: string
-}
-
-type PlantRow = {
-  id: string
-  project_id: string
-  field_id: string
-  ridge_number: number
-  row_number: number
-  plant_number: number
-  crop_name: string | null
-  planted_at: string | null
-  status: Plant['status']
-}
-
-type GrowthRecordRow = {
-  id: string
-  project_id: string
-  plant_id: string
-  recorded_at: string
-  status: GrowthRecord['status']
-  note: string
 }
 
 function projectFromRow(row: ProjectRow): Project {
@@ -67,6 +96,19 @@ function projectFromRow(row: ProjectRow): Project {
   })
 }
 
+function configFromRow(row: ProjectFieldConfigRow): ProjectFieldConfig {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    fieldId: z.nativeEnum(FieldType).parse(row.field_id),
+    ...projectFieldConfigSchema.parse({
+      ridgeCount: row.ridge_count,
+      rowCountPerRidge: row.row_count_per_ridge,
+      plantCountPerRow: row.plant_count_per_row,
+    }),
+  }
+}
+
 function projectToRow(project: Partial<Project>): Record<string, unknown> {
   const row: Record<string, unknown> = {}
   if (project.name !== undefined) row.name = project.name
@@ -77,6 +119,17 @@ function projectToRow(project: Partial<Project>): Record<string, unknown> {
   if (project.endDate !== undefined) row.end_date = project.endDate
   if (project.soilWork !== undefined) row.soil_work = project.soilWork
   return row
+}
+
+function configToRow(config: ProjectFieldConfig): Record<string, unknown> {
+  return {
+    id: config.id,
+    project_id: config.projectId,
+    field_id: config.fieldId,
+    ridge_count: config.ridgeCount,
+    row_count_per_ridge: config.rowCountPerRidge,
+    plant_count_per_row: config.plantCountPerRow,
+  }
 }
 
 function plantFromRow(row: PlantRow): Plant {
@@ -117,20 +170,95 @@ function recordFromRow(row: GrowthRecordRow): GrowthRecord {
   })
 }
 
-function recordToRow(record: CreateRecordInput): Record<string, unknown> {
+function recordToRow(record: CreateRecordInput | GrowthRecord): Record<string, unknown> {
+  const validated = createRecordSchema.parse(record)
   return {
-    project_id: record.projectId,
-    plant_id: record.plantId,
-    recorded_at: record.recordedAt,
-    status: record.status,
-    note: record.note,
+    project_id: validated.projectId,
+    plant_id: validated.plantId,
+    recorded_at: validated.recordedAt,
+    status: validated.status,
+    note: validated.note,
   }
+}
+
+export async function loadFarmState(): Promise<AppState> {
+  const client = getClient()
+  const [projectRows, configRows, plantRows, recordRows] = await Promise.all([
+    fetchAllRows(client, 'projects'),
+    fetchAllRows(client, 'project_field_configs'),
+    fetchAllRows(client, 'plants'),
+    fetchAllRows(client, 'growth_records'),
+  ])
+
+  return {
+    projects: projectRows.map((row) => projectFromRow(projectRowSchema.parse(row))),
+    projectFieldConfigs: configRows.map((row) => configFromRow(projectFieldConfigRowSchema.parse(row))),
+    plants: plantRows.map((row) => plantFromRow(plantRowSchema.parse(row))),
+    records: recordRows.map((row) => recordFromRow(growthRecordRowSchema.parse(row))),
+  }
+}
+
+function getChanges<T extends { id: string }>(previous: T[], next: T[]) {
+  const previousById = new Map(previous.map((item) => [item.id, item]))
+  const nextIds = new Set(next.map((item) => item.id))
+  return {
+    removedIds: previous.filter((item) => !nextIds.has(item.id)).map((item) => item.id),
+    changed: next.filter((item) => {
+      const oldItem = previousById.get(item.id)
+      return !oldItem || JSON.stringify(oldItem) !== JSON.stringify(item)
+    }),
+  }
+}
+
+async function deleteRows(client: SupabaseClient, table: FarmTable, ids: string[]): Promise<void> {
+  if (!ids.length) return
+  const { error } = await client.from(table).delete().in('id', ids)
+  throwOnError(error, `${table}の削除`)
+}
+
+async function upsertRows(
+  client: SupabaseClient,
+  table: FarmTable,
+  rows: Record<string, unknown>[],
+  onConflict = 'id',
+): Promise<void> {
+  if (!rows.length) return
+  const { error } = await client.from(table).upsert(rows, { onConflict })
+  throwOnError(error, `${table}の保存`)
+}
+
+export async function saveFarmState(previous: AppState, next: AppState): Promise<void> {
+  const client = getClient()
+  const projectChanges = getChanges(previous.projects, next.projects)
+  const configChanges = getChanges(previous.projectFieldConfigs, next.projectFieldConfigs)
+  const plantChanges = getChanges(previous.plants, next.plants)
+  const recordChanges = getChanges(previous.records, next.records)
+
+  await deleteRows(client, 'growth_records', recordChanges.removedIds)
+  await deleteRows(client, 'plants', plantChanges.removedIds)
+  await deleteRows(client, 'project_field_configs', configChanges.removedIds)
+  await deleteRows(client, 'projects', projectChanges.removedIds)
+
+  await upsertRows(client, 'projects', projectChanges.changed.map((project) => ({
+    id: project.id,
+    ...projectToRow(project),
+    created_at: project.createdAt,
+  })))
+  await upsertRows(client, 'project_field_configs', configChanges.changed.map(configToRow), 'project_id,field_id')
+  await upsertRows(client, 'plants', plantChanges.changed.map((plant) => ({
+    id: plant.id,
+    ...plantToRow(plant),
+  })))
+  await upsertRows(client, 'growth_records', recordChanges.changed.map((record) => ({
+    id: record.id,
+    ...recordToRow(record),
+  })))
 }
 
 export async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await getClient().from('projects').select('*').order('start_date', { ascending: false })
   if (error) throw error
-  return (data ?? []).map((project) => projectFromRow(project as ProjectRow))
+  return (data ?? []).map((project) => projectFromRow(projectRowSchema.parse(project)))
 }
 
 export async function createProject(input: CreateProjectInput): Promise<Project> {
@@ -141,7 +269,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     .select('*')
     .single()
   if (error) throw error
-  return projectFromRow(data as ProjectRow)
+  return projectFromRow(projectRowSchema.parse(data))
 }
 
 export async function updateProject(id: string, data: Partial<Project>): Promise<Project> {
@@ -152,7 +280,7 @@ export async function updateProject(id: string, data: Partial<Project>): Promise
     .select('*')
     .single()
   if (error) throw error
-  return projectFromRow(project as ProjectRow)
+  return projectFromRow(projectRowSchema.parse(project))
 }
 
 export async function deleteProject(id: string): Promise<void> {
@@ -163,7 +291,7 @@ export async function deleteProject(id: string): Promise<void> {
 export async function fetchPlantsByProject(projectId: string): Promise<Plant[]> {
   const { data, error } = await getClient().from('plants').select('*').eq('project_id', projectId)
   if (error) throw error
-  return (data ?? []).map((plant) => plantFromRow(plant as PlantRow))
+  return (data ?? []).map((plant) => plantFromRow(plantRowSchema.parse(plant)))
 }
 
 export async function updatePlant(id: string, data: Partial<Plant>): Promise<Plant> {
@@ -175,7 +303,7 @@ export async function updatePlant(id: string, data: Partial<Plant>): Promise<Pla
     .select('*')
     .single()
   if (error) throw error
-  return plantFromRow(plant as PlantRow)
+  return plantFromRow(plantRowSchema.parse(plant))
 }
 
 export async function bulkInsertPlants(plants: Plant[]): Promise<void> {
@@ -202,7 +330,7 @@ export async function fetchRecordsByProject(projectId: string): Promise<GrowthRe
     .eq('project_id', projectId)
     .order('recorded_at', { ascending: false })
   if (error) throw error
-  return (data ?? []).map((record) => recordFromRow(record as GrowthRecordRow))
+  return (data ?? []).map((record) => recordFromRow(growthRecordRowSchema.parse(record)))
 }
 
 export async function createRecord(input: CreateRecordInput): Promise<GrowthRecord> {
@@ -213,7 +341,7 @@ export async function createRecord(input: CreateRecordInput): Promise<GrowthReco
     .select('*')
     .single()
   if (error) throw error
-  return recordFromRow(data as GrowthRecordRow)
+  return recordFromRow(growthRecordRowSchema.parse(data))
 }
 
 export async function deleteRecord(id: string): Promise<void> {

@@ -1,6 +1,6 @@
 # Nawate
 
-Nawateは、プロジェクトごとに作物・畑の構成・個体の生育記録を管理する日本語の農業管理アプリです。畑は `constants/fields.ts` の固定選択肢で管理し、農業データはカスタムフック `useAppState` と React `useReducer` によりメモリ内だけで保持します。ブラウザーのストレージやSupabaseへの農業データ保存は行いません。
+Nawateは、プロジェクトごとに作物・畑の構成・個体の生育記録を管理する日本語の農業管理アプリです。畑は `constants/fields.ts` の固定選択肢で管理します。ローカル開発とVercel Previewではサンプルデータを使うモックAPI、本番環境ではSupabase APIに接続します。
 
 ## 主な機能
 
@@ -86,11 +86,13 @@ Nawateは、プロジェクトごとに作物・畑の構成・個体の生育�
 pnpm install
 ```
 
-## Supabase Authの設定
+## Supabase Authと本番APIの設定
 
 このアプリはリモート環境でSupabase Authのメールアドレス・パスワード認証を使います。ログイン画面は `/login` です。ログインしていない状態で他のページを開くとログイン画面へ移動し、ログイン後は元のページへ戻ります。画面上部の「ログアウト」からセッションを終了できます。
 
-ローカル開発サーバー（`pnpm dev`）では、実装作業を進められるよう認証をスキップします。`/` や `/projects` などを直接開いてください。`/login` を開くと `/` に移動します。**本番環境では認証が必須**で、Supabaseの接続情報が未設定ならアプリ画面へ進めません。
+ローカル開発サーバー（`pnpm dev`）では、認証をスキップしてモックAPIを使います。Supabaseの接続情報がなくても `/` や `/projects` などを直接開けます。`/login` を開くと `/` に移動します。**Previewと本番環境では認証が必須**で、Supabaseの接続情報が未設定ならアプリ画面へ進めません。
+
+ローカル開発だけであれば、以下のSupabase設定は不要です。Preview環境ではSupabase Authを使いながら農業データはモックAPIで扱い、本番環境ではAuthと農業データAPIの両方にSupabaseを使います。
 
 ### 1. Supabaseの接続情報を設定
 
@@ -108,6 +110,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=ここにanon_key
 
 コード側で参照する場所は `lib/supabase/client.ts`、`lib/supabase/server.ts`、`proxy.ts` です。通常はコードを変更せず、`.env.local` の値だけを設定してください。環境変数を変更したら開発サーバーを再起動します。
 
+本番データベースには、SupabaseのSQL Editorで [`supabase/schema.sql`](./supabase/schema.sql) を実行してテーブルとRLSポリシーを作成してください。ローカル開発とPreviewはモックAPIを使うため、農業データ用のテーブル設定は不要です。
+
 ### 2. 管理者アカウントを1つ作成
 
 Supabaseの **Authentication → Users** から **Add user** を選び、管理者のメールアドレスとパスワードを登録してください。ユーザー登録画面はアプリに用意していません。
@@ -124,7 +128,7 @@ pnpm dev
 
 本番環境にデプロイする場合も、ホスティング先の環境変数設定にProject URLとどちらか一方の公開キーを登録してください。キーをソースコードへ直接書いたり、`service_role` / secret keyをブラウザー向けの環境変数に設定したりしないでください。
 
-> Supabaseは認証にのみ使用しています。プロジェクト・畑構成・個体・生育記録はサンプルデータで初期化し、メモリ上で管理しています。ページを再読み込みすると変更は初期データに戻ります。`localStorage` / `sessionStorage` は使いません。
+ローカル開発とPreviewは `lib/mock-farm-api.ts` のモックAPIを使い、画面操作中はメモリ上でサンプルデータを更新します。ページを再読み込みすると初期サンプルデータに戻ります。本番環境は `VERCEL_ENV=production`（またはVercel以外の本番起動）でSupabase APIを使い、プロジェクト・畑構成・個体・生育記録をデータベースへ保存します。APIの読み込み・保存に失敗した場合は画面にエラーを表示します。
 
 ## GitHub ActionsによるVercelデプロイ
 
@@ -132,14 +136,14 @@ pnpm dev
 
 | ブランチ／イベント                       | 動作                                    |
 | ---------------------------------------- | --------------------------------------- |
-| `develop` へのpush                       | Vercel Preview環境へデプロイ            |
-| `main` へのpush                          | Vercel Production環境へデプロイ         |
+| `develop` へのpush                       | Vercel Preview環境へデプロイ（モックAPI） |
+| `main` へのpush                          | Vercel Production環境へデプロイ（Supabase API） |
 | `develop` または `main` 向けPull Request | `pnpm build` のみ実行し、デプロイしない |
 
 ### 初回設定
 
 1. VercelでこのGitHubリポジトリをプロジェクトとして登録し、Production Branchを `main` に設定します。
-2. Vercelのプロジェクト設定で `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY`（または `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`）をPreviewとProductionの両方に登録します。
+2. Vercelのプロジェクト設定で `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY`（または `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`）をPreviewとProductionに登録します。Previewでは認証に、Productionでは認証と農業データAPIに使います。
 3. GitHubリポジトリの **Settings → Secrets and variables → Actions** に、次のRepository secretsを登録します。
    - `VERCEL_TOKEN`: VercelのAccount Settingsで発行したアクセストークン
    - `VERCEL_ORG_ID`: Vercelチーム／アカウントID
@@ -154,11 +158,11 @@ GitHub ActionsとVercelのGit連携による二重デプロイを避けるため
 
 画面はスマートフォン幅に合わせたレスポンシブレイアウトで、ナビゲーションは横スクロール、畑構成フォームと個体一覧は小さい画面で縦並びになります。Next.js App Routerのリンク遷移を使っており、ページ遷移時に全体を再読み込みしないSPA風ナビゲーションが有効です。
 
-`app/manifest.ts` はアプリ名・起動URL・standalone表示・テーマ色を定義します。HTTPSで公開後、対応ブラウザーの共有／メニューからホーム画面へ追加できます。認証が必要な農業データを端末に残さないため、Service Workerによるオフラインキャッシュは設定していません。また、データ保存自体がインメモリのため、オフライン対応・再起動後のデータ保持はありません。
+`app/manifest.ts` はアプリ名・起動URL・standalone表示・テーマ色を定義します。HTTPSで公開後、対応ブラウザーの共有／メニューからホーム画面へ追加できます。認証が必要な農業データを端末に残さないため、Service Workerによるオフラインキャッシュは設定していません。農業データAPIを利用するにはオンライン接続が必要です。
 
-### 農業データの保存と将来のバックエンド連携
+### 農業データのAPI接続
 
-現在の画面は `useAppState` と `useReducer` により、`Project`、`ProjectFieldConfig`、`Plant`、`GrowthRecord` をメモリ内で管理します。畑は `constants/fields.ts` の固定選択肢であり、土づくり情報はプロジェクトの `soilWork` にまとめます。元肥・追肥は全畑共通設定または畑別設定を選び、各畑に複数件登録できます。`lib/supabase.ts` には型付きの取得・作成・更新・削除関数を用意していますが、現在の画面状態はまだSupabaseへ保存せず、ページ再読み込み時に初期サンプルデータへ戻ります。Supabase API関数を使う場合は `NEXT_PUBLIC_SUPABASE_URL` と公開キーを設定してください。
+画面状態は `useAppState` と `useReducer` で管理し、`FarmProvider` がモックAPIまたはSupabase APIと同期します。ローカル開発とVercel Previewでは `Project`、`ProjectFieldConfig`、`Plant`、`GrowthRecord` をモックデータ上で操作し、再読み込み時に初期サンプルデータへ戻します。Vercel Productionおよび本番起動では `lib/supabase.ts` がSupabaseから全データを読み込み、変更を保存します。本番データベースは空の状態から始まるため、必要な初期プロジェクトはProduction上で作成してください。土づくり情報はプロジェクトの `soilWork` に保持します。
 
 `supabase/schema.sql` は現在のモデルに対応する初期スキーマです。`projects.field_ids` は畑Enum値の配列、`projects.soil_work` は全畑共通または畑別の元肥・追肥を含むJSONBです。`project_field_configs` はプロジェクトと畑の組ごとに構成を保持し、`plants` はプロジェクト・畑・畝・列・番号で一意になります。生育記録は個体に外部キーで紐づき、プロジェクト／構成／個体の削除時に関連データがカスケード削除されます。畑マスタテーブルは作成しません。SQL Editorではこのスキーマを新規データベースに適用してください。既存の旧スキーマを移行する場合は、データを保全する個別のマイグレーションを作成し、初期スキーマをそのまま再実行しないでください。
 

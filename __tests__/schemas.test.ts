@@ -98,6 +98,10 @@ describe('project schemas', () => {
     expect(createdAt).toBeTruthy()
   })
 
+  it('accepts timestamps with timezone offsets returned by Supabase', () => {
+    expect(projectSchema.safeParse({ ...project, createdAt: '2026-10-16T11:00:00+00:00' }).success).toBe(true)
+  })
+
   it('rejects invalid fields, years, required fields, and date order', () => {
     expect(createProjectSchema.safeParse({ ...project, fieldIds: [] }).success).toBe(false)
     expect(createProjectSchema.safeParse({ ...project, year: 2200 }).success).toBe(false)

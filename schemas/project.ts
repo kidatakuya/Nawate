@@ -13,7 +13,7 @@ const projectObjectSchema = z.object({
   startDate: z.string().regex(datePattern, '開始日を入力してください'),
   endDate: z.string().regex(datePattern).nullable(),
   soilWork: soilWorkSchema,
-  createdAt: z.string().datetime(),
+  createdAt: z.string().datetime({ offset: true }),
 })
 
 const validateProject = (

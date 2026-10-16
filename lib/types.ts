@@ -1,11 +1,13 @@
 import type { GrowthRecord, Plant, PlantUpdate, Project, ProjectFieldConfig, ProjectFieldConfigInput, SoilWork } from '@/types/models'
 import type { FieldType, CropStatus } from '@/types/enums'
 
-export type { FieldType, CropStatus } from '@/types/enums'
+export { FieldType } from '@/types/enums'
+export type { CropStatus } from '@/types/enums'
 export type {
   GrowthRecord,
   GrowthRecordInput,
   FertilizerItem,
+  FertilizerPlan,
   Plant,
   PlantUpdate,
   Project,

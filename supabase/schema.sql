@@ -1,8 +1,30 @@
 -- 初回セットアップ用スキーマ。Supabase SQL Editorで実行してください。
--- 畑はアプリ定数（east / west / north / south）で管理し、畑マスタテーブルは作成しません。
--- Projects.soil_work は SoilWork のJSONB、元肥・追肥は複数件を配列で保持します。
+-- 畑はアプリ定数（yamada2 / yamada3 / ikonouchi1）で管理し、畑マスタテーブルは作成しません。
+-- Projects.soil_work は SoilWork のJSONB。肥料は全畑共通または畑ごとに保持します。
 
-create or replace function public.is_soil_work_valid(value jsonb)
+create or replace function public.is_fertilizer_array_valid(value jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when jsonb_typeof(value) is distinct from 'array' then false
+    else
+      not exists (
+        select 1
+        from jsonb_array_elements(value) as fertilizer(item)
+        where jsonb_typeof(item) is distinct from 'object'
+          or jsonb_typeof(item -> 'name') is distinct from 'string'
+          or coalesce(item ->> 'name', '') = ''
+          or coalesce(item ->> 'date', '') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          or jsonb_typeof(item -> 'amount') is distinct from 'string'
+          or jsonb_typeof(item -> 'note') is distinct from 'string'
+      )
+  end;
+$$;
+
+create or replace function public.is_fertilizer_plan_valid(value jsonb)
 returns boolean
 language sql
 immutable
@@ -12,31 +34,32 @@ as $$
     when jsonb_typeof(value) is distinct from 'object' then false
     when jsonb_typeof(value -> 'baseFertilizers') is distinct from 'array' then false
     when jsonb_typeof(value -> 'topDressings') is distinct from 'array' then false
+    else public.is_fertilizer_array_valid(value -> 'baseFertilizers')
+      and public.is_fertilizer_array_valid(value -> 'topDressings')
+  end;
+$$;
+
+create or replace function public.is_soil_work_valid(value jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when jsonb_typeof(value) is distinct from 'object' then false
+    when coalesce(value ->> 'fertilizerMode', '') not in ('shared', 'perField') then false
+    when jsonb_typeof(value -> 'fieldFertilizers') is distinct from 'object' then false
     when jsonb_typeof(value -> 'sowing') is distinct from 'string' then false
     when jsonb_typeof(value -> 'sowingDate') is distinct from 'string' then false
     when jsonb_typeof(value -> 'note') is distinct from 'string' then false
-    else
-      not exists (
-        select 1
-        from jsonb_array_elements(value -> 'baseFertilizers') as fertilizer(item)
-        where jsonb_typeof(item) is distinct from 'object'
-          or jsonb_typeof(item -> 'name') is distinct from 'string'
-          or coalesce(item ->> 'name', '') = ''
-          or coalesce(item ->> 'date', '') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-          or jsonb_typeof(item -> 'amount') is distinct from 'string'
-          or jsonb_typeof(item -> 'note') is distinct from 'string'
-      )
-      and not exists (
-        select 1
-        from jsonb_array_elements(value -> 'topDressings') as fertilizer(item)
-        where jsonb_typeof(item) is distinct from 'object'
-          or jsonb_typeof(item -> 'name') is distinct from 'string'
-          or coalesce(item ->> 'name', '') = ''
-          or coalesce(item ->> 'date', '') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-          or jsonb_typeof(item -> 'amount') is distinct from 'string'
-          or jsonb_typeof(item -> 'note') is distinct from 'string'
-      )
-      and (
+    when not public.is_fertilizer_plan_valid(value -> 'sharedFertilizers') then false
+    when exists (
+      select 1
+      from jsonb_each(value -> 'fieldFertilizers') as field(field_id, plan)
+      where field_id not in ('yamada2', 'yamada3', 'ikonouchi1')
+        or not public.is_fertilizer_plan_valid(plan)
+    ) then false
+    else (
         value ->> 'sowingDate' = ''
         or value ->> 'sowingDate' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
       )
@@ -50,13 +73,14 @@ create table public.projects (
   crop_name text not null check (char_length(trim(crop_name)) >= 1),
   field_ids text[] not null check (
     cardinality(field_ids) between 1 and 4
-    and field_ids <@ array['east', 'west', 'north', 'south']::text[]
+    and field_ids <@ array['yamada2', 'yamada3', 'ikonouchi1']::text[]
   ),
   start_date date not null,
   end_date date,
   soil_work jsonb not null default '{
-    "baseFertilizers": [],
-    "topDressings": [],
+    "fertilizerMode": "shared",
+    "sharedFertilizers": {"baseFertilizers": [], "topDressings": []},
+    "fieldFertilizers": {},
     "sowing": "",
     "sowingDate": "",
     "note": ""
@@ -68,7 +92,7 @@ create table public.projects (
 create table public.project_field_configs (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
-  field_id text not null check (field_id in ('east', 'west', 'north', 'south')),
+  field_id text not null check (field_id in ('yamada2', 'yamada3', 'ikonouchi1')),
   ridge_count integer not null check (ridge_count between 1 and 50),
   row_count_per_ridge integer not null check (row_count_per_ridge between 1 and 20),
   plant_count_per_row integer not null check (plant_count_per_row between 1 and 200),

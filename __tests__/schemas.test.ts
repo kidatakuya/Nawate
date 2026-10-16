@@ -2,10 +2,15 @@ import { createProjectSchema, projectSchema } from '@/schemas/project'
 import { plantSchema, updatePlantSchema } from '@/schemas/plant'
 import { createRecordSchema, growthRecordSchema } from '@/schemas/record'
 import { fertilizerItemSchema, soilWorkSchema } from '@/schemas/soilWork'
+import { FieldType } from '@/types/enums'
 
 const soilWork = {
-  baseFertilizers: [{ name: '有機肥料', date: '2026-03-01', amount: '1kg', note: '' }],
-  topDressings: [],
+  fertilizerMode: 'shared' as const,
+  sharedFertilizers: {
+    baseFertilizers: [{ name: '有機肥料', date: '2026-03-01', amount: '1kg', note: '' }],
+    topDressings: [],
+  },
+  fieldFertilizers: {},
   sowing: 'トマト苗',
   sowingDate: '2026-03-15',
   note: '',
@@ -16,7 +21,7 @@ const project = {
   name: '2026年春トマト',
   year: 2026,
   cropName: 'トマト',
-  fieldIds: ['east'],
+  fieldIds: [FieldType.YAMADA2],
   startDate: '2026-03-15',
   endDate: null,
   soilWork,
@@ -35,17 +40,29 @@ describe('soilWorkSchema', () => {
       note: '',
     })
     expect(soilWorkSchema.parse({
-      baseFertilizers: [
-        { name: '堆肥', date: '2026-02-20' },
-        { name: '有機肥料', date: '2026-03-01', amount: '1kg', note: '畝ごとに施用' },
-      ],
-      topDressings: [{ name: '液肥', date: '2026-03-20' }],
+      fertilizerMode: 'perField',
+      sharedFertilizers: { baseFertilizers: [], topDressings: [] },
+      fieldFertilizers: {
+        yamada2: {
+          baseFertilizers: [
+            { name: '堆肥', date: '2026-02-20' },
+            { name: '有機肥料', date: '2026-03-01', amount: '1kg', note: '畝ごとに施用' },
+          ],
+          topDressings: [{ name: '液肥', date: '2026-03-20' }],
+        },
+      },
     })).toEqual({
-      baseFertilizers: [
-        { name: '堆肥', date: '2026-02-20', amount: '', note: '' },
-        { name: '有機肥料', date: '2026-03-01', amount: '1kg', note: '畝ごとに施用' },
-      ],
-      topDressings: [{ name: '液肥', date: '2026-03-20', amount: '', note: '' }],
+      fertilizerMode: 'perField',
+      sharedFertilizers: { baseFertilizers: [], topDressings: [] },
+      fieldFertilizers: {
+        yamada2: {
+          baseFertilizers: [
+            { name: '堆肥', date: '2026-02-20', amount: '', note: '' },
+            { name: '有機肥料', date: '2026-03-01', amount: '1kg', note: '畝ごとに施用' },
+          ],
+          topDressings: [{ name: '液肥', date: '2026-03-20', amount: '', note: '' }],
+        },
+      },
       sowing: '',
       sowingDate: '',
       note: '',
@@ -56,6 +73,19 @@ describe('soilWorkSchema', () => {
     expect(fertilizerItemSchema.safeParse({ name: '', date: '2026-03-01' }).success).toBe(false)
     expect(fertilizerItemSchema.safeParse({ name: '肥料', date: '2026/03/01' }).success).toBe(false)
     expect(soilWorkSchema.safeParse({ ...soilWork, sowingDate: '2026/03/01' }).success).toBe(false)
+  })
+
+  it('converts existing shared fertilizer data to the new shared mode', () => {
+    expect(soilWorkSchema.parse({
+      baseFertilizers: [{ name: '有機肥料', date: '2026-03-01' }],
+      topDressings: [],
+      sowing: '',
+      sowingDate: '',
+      note: '',
+    })).toMatchObject({
+      fertilizerMode: 'shared',
+      sharedFertilizers: { baseFertilizers: [{ name: '有機肥料', date: '2026-03-01', amount: '', note: '' }] },
+    })
   })
 })
 
@@ -73,7 +103,27 @@ describe('project schemas', () => {
     expect(createProjectSchema.safeParse({ ...project, year: 2200 }).success).toBe(false)
     expect(createProjectSchema.safeParse({ ...project, name: '' }).success).toBe(false)
     expect(createProjectSchema.safeParse({ ...project, endDate: '2026-03-01' }).success).toBe(false)
-    expect(createProjectSchema.safeParse({ ...project, soilWork: { ...soilWork, baseFertilizers: [{ name: '', date: '2026-03-01' }] } }).success).toBe(false)
+    expect(createProjectSchema.safeParse({ ...project, soilWork: { ...soilWork, sharedFertilizers: { baseFertilizers: [{ name: '', date: '2026-03-01' }], topDressings: [] } } }).success).toBe(false)
+  })
+
+  it('requires a fertilizer plan for every selected field in per-field mode', () => {
+    const perFieldProject = {
+      ...project,
+      fieldIds: [FieldType.YAMADA2, FieldType.YAMADA3],
+      soilWork: {
+        ...soilWork,
+        fertilizerMode: 'perField' as const,
+        fieldFertilizers: {
+          [FieldType.YAMADA2]: { baseFertilizers: [], topDressings: [] },
+          [FieldType.YAMADA3]: { baseFertilizers: [], topDressings: [] },
+        },
+      },
+    }
+    expect(projectSchema.safeParse(perFieldProject).success).toBe(true)
+    expect(projectSchema.safeParse({
+      ...perFieldProject,
+      soilWork: { ...perFieldProject.soilWork, fieldFertilizers: { [FieldType.YAMADA2]: { baseFertilizers: [], topDressings: [] } } },
+    }).success).toBe(false)
   })
 })
 
@@ -81,7 +131,7 @@ describe('plant schemas', () => {
   const plant = {
     id: 'a2d97b05-e7e4-429c-a81a-95e27b0d0e22',
     projectId: project.id,
-    fieldId: 'east',
+    fieldId: FieldType.YAMADA2,
     ridgeNumber: 1,
     rowNumber: 1,
     plantNumber: 1,

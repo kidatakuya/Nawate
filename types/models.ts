@@ -7,9 +7,15 @@ export type FertilizerItem = {
   note: string
 }
 
-export type SoilWork = {
+export type FertilizerPlan = {
   baseFertilizers: FertilizerItem[]
   topDressings: FertilizerItem[]
+}
+
+export type SoilWork = {
+  fertilizerMode: 'shared' | 'perField'
+  sharedFertilizers: FertilizerPlan
+  fieldFertilizers: Partial<Record<FieldType, FertilizerPlan>>
   sowing: string
   sowingDate: string
   note: string

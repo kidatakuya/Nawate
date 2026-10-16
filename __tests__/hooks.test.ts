@@ -1,11 +1,12 @@
 import { generatePlantsForConfig, plantsRemovedByConfig, updatePlantsFromRecord } from '@/lib/farm-reducer'
 import type { Plant } from '@/types/models'
+import { FieldType } from '@/types/enums'
 
 const existingPlants: Plant[] = [
   {
     id: 'retained-plant',
     projectId: 'project-1',
-    fieldId: 'east',
+    fieldId: FieldType.YAMADA2,
     ridgeNumber: 1,
     rowNumber: 1,
     plantNumber: 1,
@@ -16,7 +17,7 @@ const existingPlants: Plant[] = [
   {
     id: 'empty-plant',
     projectId: 'project-1',
-    fieldId: 'east',
+    fieldId: FieldType.YAMADA2,
     ridgeNumber: 1,
     rowNumber: 1,
     plantNumber: 2,
@@ -27,7 +28,7 @@ const existingPlants: Plant[] = [
   {
     id: 'removed-plant',
     projectId: 'project-1',
-    fieldId: 'east',
+    fieldId: FieldType.YAMADA2,
     ridgeNumber: 2,
     rowNumber: 1,
     plantNumber: 1,
@@ -39,7 +40,7 @@ const existingPlants: Plant[] = [
 
 describe('plant configuration operations', () => {
   it('preserves registered plants by position and creates empty slots', () => {
-    const regenerated = generatePlantsForConfig('project-1', 'east', {
+    const regenerated = generatePlantsForConfig('project-1', FieldType.YAMADA2, {
       ridgeCount: 1,
       rowCountPerRidge: 1,
       plantCountPerRow: 3,

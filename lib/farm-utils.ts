@@ -1,4 +1,5 @@
 import type { CropStatus, FieldType } from '@/lib/types'
+import { fieldLabel } from '@/constants/fields'
 
 export const CROP_STATUSES: readonly CropStatus[] = [
   'empty', 'sprouted', 'growing', 'flowering', 'harvested', 'withered',
@@ -76,15 +77,8 @@ export function calculateCapacity(ridgeCount: number, rowCountPerRidge: number, 
   return ridgeCount * rowCountPerRidge * plantCountPerRow
 }
 
-const FIELD_LABELS: Record<FieldType, string> = {
-  east: '東の畑',
-  west: '西の畑',
-  north: '北の畑',
-  south: '南の畑',
-}
-
 export function getFieldLabel(fieldId: FieldType): string {
-  return FIELD_LABELS[fieldId]
+  return fieldLabel(fieldId)
 }
 
 export function isValidDateString(value: string): boolean {

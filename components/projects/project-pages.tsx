@@ -30,11 +30,13 @@ import {
   usedOf,
   type StatusCounts,
 } from '@/lib/farm-utils'
-import type { CropStatus, FieldType, GrowthRecord, Plant, Project, ProjectFieldConfig, ProjectFieldConfigInput, SoilWork } from '@/lib/types'
+import type { CropStatus, FieldType, FertilizerItem, FertilizerPlan, GrowthRecord, Plant, Project, ProjectFieldConfig, ProjectFieldConfigInput, SoilWork } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { projectFieldConfigSchema } from '@/schemas/fieldConfig'
 import { soilWorkSchema } from '@/schemas/soilWork'
 import type { CreateRecordInput } from '@/schemas/record'
+
+type FertilizerList = 'baseFertilizers' | 'topDressings'
 
 function PageTitle({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
@@ -166,44 +168,87 @@ export function ProjectListPage() {
   </>
 }
 
-function SoilWorkForm({ value, onChange, errors = {} }: { value: SoilWork; onChange: (value: SoilWork) => void; errors?: Record<string, string> }) {
+function SoilWorkForm({ value, onChange, fieldIds, errors = {} }: { value: SoilWork; onChange: (value: SoilWork) => void; fieldIds: FieldType[]; errors?: Record<string, string> }) {
   const setField = <Key extends keyof SoilWork>(key: Key, next: SoilWork[Key]) => onChange({ ...value, [key]: next })
-  const updateFertilizer = (list: 'baseFertilizers' | 'topDressings', index: number, key: 'name' | 'date' | 'amount' | 'note', next: string) => {
-    const items = [...value[list]]
-    items[index] = { ...items[index], [key]: next }
-    setField(list, items)
+  const setMode = (fertilizerMode: SoilWork['fertilizerMode']) => {
+    const fieldFertilizers = { ...value.fieldFertilizers }
+    let sharedFertilizers = value.sharedFertilizers
+    if (fertilizerMode === 'perField') {
+      for (const fieldId of fieldIds) {
+        fieldFertilizers[fieldId] ??= {
+          baseFertilizers: [...value.sharedFertilizers.baseFertilizers],
+          topDressings: [...value.sharedFertilizers.topDressings],
+        }
+      }
+    } else if (value.fertilizerMode === 'perField' && fieldIds[0]) {
+      const firstFieldPlan = fieldFertilizers[fieldIds[0]]
+      if (firstFieldPlan) {
+        sharedFertilizers = {
+          baseFertilizers: [...firstFieldPlan.baseFertilizers],
+          topDressings: [...firstFieldPlan.topDressings],
+        }
+      }
+    }
+    onChange({ ...value, fertilizerMode, sharedFertilizers, fieldFertilizers })
   }
-  const addFertilizer = (list: 'baseFertilizers' | 'topDressings') => setField(list, [
-    ...value[list],
-    { name: '', date: todayString(), amount: '', note: '' },
-  ])
-  const removeFertilizer = (list: 'baseFertilizers' | 'topDressings', index: number) => {
-    setField(list, value[list].filter((_, itemIndex) => itemIndex !== index))
+  const updatePlan = (fieldId: FieldType | null, next: FertilizerPlan) => {
+    if (fieldId === null) setField('sharedFertilizers', next)
+    else setField('fieldFertilizers', { ...value.fieldFertilizers, [fieldId]: next })
   }
-  const fertilizerGroup = (list: 'baseFertilizers' | 'topDressings', title: string) => (
+  const fertilizerGroup = (plan: FertilizerPlan, onPlanChange: (plan: FertilizerPlan) => void, prefix: string, list: FertilizerList, title: string) => {
+    const updateFertilizer = (index: number, key: 'name' | 'date' | 'amount' | 'note', next: string) => {
+      const items = [...plan[list]]
+      items[index] = { ...items[index], [key]: next }
+      onPlanChange({ ...plan, [list]: items })
+    }
+    const addFertilizer = () => onPlanChange({
+      ...plan,
+      [list]: [...plan[list], { name: '', date: todayString(), amount: '', note: '' }],
+    })
+    const removeFertilizer = (index: number) => onPlanChange({
+      ...plan,
+      [list]: plan[list].filter((_, itemIndex) => itemIndex !== index),
+    })
+    return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <Button type="button" size="sm" variant="outline" onClick={() => addFertilizer(list)}>＋ {title}を追加</Button>
+        <Button type="button" size="sm" variant="outline" onClick={addFertilizer}>＋ {title}を追加</Button>
       </div>
-      {value[list].map((item, index) => {
-        const prefix = `${list}.${index}`
+      {plan[list].map((item, index) => {
+        const itemPrefix = `${prefix}.${list}.${index}`
         return <div key={`${list}-${index}`} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
-          <label className="space-y-1 text-sm">肥料名<Input aria-invalid={!!errors[`${prefix}.name`]} value={item.name} onChange={(event) => updateFertilizer(list, index, 'name', event.target.value)} />{errors[`${prefix}.name`] && <span className="block text-xs text-destructive">{errors[`${prefix}.name`]}</span>}</label>
-          <label className="space-y-1 text-sm">施用日<Input aria-invalid={!!errors[`${prefix}.date`]} type="date" value={item.date} onChange={(event) => updateFertilizer(list, index, 'date', event.target.value)} />{errors[`${prefix}.date`] && <span className="block text-xs text-destructive">{errors[`${prefix}.date`]}</span>}</label>
-          <label className="space-y-1 text-sm">施用量<Input value={item.amount} onChange={(event) => updateFertilizer(list, index, 'amount', event.target.value)} /></label>
-          <label className="space-y-1 text-sm">備考<Input value={item.note} onChange={(event) => updateFertilizer(list, index, 'note', event.target.value)} /></label>
-          <div className="sm:col-span-2"><Button type="button" size="sm" variant="ghost" onClick={() => removeFertilizer(list, index)}><Trash2 />削除</Button></div>
+          <label className="space-y-1 text-sm">肥料名<Input aria-invalid={!!errors[`${itemPrefix}.name`]} value={item.name} onChange={(event) => updateFertilizer(index, 'name', event.target.value)} />{errors[`${itemPrefix}.name`] && <span className="block text-xs text-destructive">{errors[`${itemPrefix}.name`]}</span>}</label>
+          <label className="space-y-1 text-sm">施用日<Input aria-invalid={!!errors[`${itemPrefix}.date`]} type="date" value={item.date} onChange={(event) => updateFertilizer(index, 'date', event.target.value)} />{errors[`${itemPrefix}.date`] && <span className="block text-xs text-destructive">{errors[`${itemPrefix}.date`]}</span>}</label>
+          <label className="space-y-1 text-sm">施用量<Input value={item.amount} onChange={(event) => updateFertilizer(index, 'amount', event.target.value)} /></label>
+          <label className="space-y-1 text-sm">備考<Input value={item.note} onChange={(event) => updateFertilizer(index, 'note', event.target.value)} /></label>
+          <div className="sm:col-span-2"><Button type="button" size="sm" variant="ghost" onClick={() => removeFertilizer(index)}><Trash2 />削除</Button></div>
         </div>
       })}
-      {value[list].length === 0 && <p className="text-xs text-muted-foreground">登録された項目はありません。</p>}
+      {plan[list].length === 0 && <p className="text-xs text-muted-foreground">登録された項目はありません。</p>}
+    </div>
+    )
+  }
+  const fertilizerPlanForm = (plan: FertilizerPlan, onPlanChange: (plan: FertilizerPlan) => void, prefix: string) => (
+    <div className="space-y-5">
+      {fertilizerGroup(plan, onPlanChange, prefix, 'baseFertilizers', '元肥')}
+      {fertilizerGroup(plan, onPlanChange, prefix, 'topDressings', '追肥')}
     </div>
   )
   return <fieldset className="space-y-3 rounded-xl border p-4">
     <legend className="px-1 font-semibold">土づくり情報</legend>
     <div className="space-y-5">
-      {fertilizerGroup('baseFertilizers', '元肥')}
-      {fertilizerGroup('topDressings', '追肥')}
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">肥料の設定方法</legend>
+        <label className="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="fertilizer-mode" checked={value.fertilizerMode === 'shared'} onChange={() => setMode('shared')} />全ての畑で同じ肥料を使う</label>
+        <label className="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="fertilizer-mode" checked={value.fertilizerMode === 'perField'} onChange={() => setMode('perField')} />畑ごとに分けて設定する</label>
+      </fieldset>
+      {value.fertilizerMode === 'shared'
+        ? <div className="rounded-lg border p-3"><p className="mb-3 text-sm font-medium">共通の肥料設定</p>{fertilizerPlanForm(value.sharedFertilizers, (plan) => updatePlan(null, plan), 'sharedFertilizers')}</div>
+        : <div className="space-y-4">{fieldIds.length ? fieldIds.map((fieldId) => {
+          const plan = value.fieldFertilizers[fieldId] ?? { baseFertilizers: [], topDressings: [] }
+          return <section key={fieldId} className="space-y-3 rounded-lg border p-3"><h3 className="font-medium">{fieldLabel(fieldId)}</h3>{fertilizerPlanForm(plan, (next) => updatePlan(fieldId, next), `fieldFertilizers.${fieldId}`)}</section>
+        }) : <p className="text-sm text-muted-foreground">先に使用する畑を選択してください。</p>}</div>}
       <div className="grid gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-sm">播種・植え付け内容<Input value={value.sowing} onChange={(event) => setField('sowing', event.target.value)} /></label>
       <label className="space-y-1 text-sm">播種日<Input aria-invalid={!!errors.sowingDate} type="date" value={value.sowingDate} onChange={(event) => setField('sowingDate', event.target.value)} />{errors.sowingDate && <span className="block text-xs text-destructive">{errors.sowingDate}</span>}</label>
@@ -213,8 +258,8 @@ function SoilWorkForm({ value, onChange, errors = {} }: { value: SoilWork; onCha
   </fieldset>
 }
 
-function SoilWorkCard({ soilWork, onEdit }: { soilWork: SoilWork; onEdit: () => void }) {
-  const fertilizerList = (title: string, items: SoilWork['baseFertilizers']) => (
+function SoilWorkCard({ soilWork, fieldIds, onEdit }: { soilWork: SoilWork; fieldIds: FieldType[]; onEdit: () => void }) {
+  const fertilizerList = (title: string, items: FertilizerItem[]) => (
     <div className="rounded-lg bg-muted/60 p-3">
       <p className="mb-2 text-xs text-muted-foreground">{title}</p>
       {items.length ? <ul className="space-y-2">{items.map((item, index) => <li key={`${title}-${index}`} className="border-b pb-2 last:border-0 last:pb-0">
@@ -224,13 +269,18 @@ function SoilWorkCard({ soilWork, onEdit }: { soilWork: SoilWork; onEdit: () => 
       </li>)}</ul> : <p className="text-sm">未登録</p>}
     </div>
   )
+  const plans = soilWork.fertilizerMode === 'shared'
+    ? [{ label: '共通', ...soilWork.sharedFertilizers }]
+    : fieldIds.map((fieldId) => ({
+      label: fieldLabel(fieldId),
+      ...(soilWork.fieldFertilizers[fieldId] ?? { baseFertilizers: [], topDressings: [] }),
+    }))
   return <section className="mb-8 rounded-xl border bg-card p-4">
     <div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-semibold">土づくり</h2><Button type="button" variant="outline" className="print:hidden" onClick={onEdit}>土づくりを編集</Button></div>
-    <div className="grid gap-3 sm:grid-cols-3">
-      {fertilizerList('元肥', soilWork.baseFertilizers)}
-      {fertilizerList('追肥', soilWork.topDressings)}
+    <div className="grid gap-3 sm:grid-cols-2">
+      {plans.map((plan) => <div key={plan.label} className="space-y-2 rounded-lg border p-3"><h3 className="font-medium">{soilWork.fertilizerMode === 'shared' ? '全畑共通の肥料' : `${plan.label}の肥料`}</h3><div className="grid gap-3 sm:grid-cols-2">{fertilizerList('元肥', plan.baseFertilizers)}{fertilizerList('追肥', plan.topDressings)}</div></div>)}
       <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">播種・植え付け</p><p className="mt-1 font-medium">{soilWork.sowing || '未登録'}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(soilWork.sowingDate)}</p></div>
-      <div className="rounded-lg bg-muted/60 p-3 sm:col-span-3"><p className="text-xs text-muted-foreground">メモ</p><p className="mt-1 whitespace-pre-wrap">{soilWork.note || '未登録'}</p></div>
+      <div className="rounded-lg bg-muted/60 p-3 sm:col-span-2"><p className="text-xs text-muted-foreground">メモ</p><p className="mt-1 whitespace-pre-wrap">{soilWork.note || '未登録'}</p></div>
     </div>
   </section>
 }
@@ -245,13 +295,31 @@ export function NewProjectPage() {
   const [startDate, setStartDate] = useState(todayString())
   const [endDate, setEndDate] = useState('')
   const [soilWork, setSoilWork] = useState<SoilWork>({
-    baseFertilizers: [],
-    topDressings: [],
+    fertilizerMode: 'shared',
+    sharedFertilizers: { baseFertilizers: [], topDressings: [] },
+    fieldFertilizers: {},
     sowing: '',
     sowingDate: '',
     note: '',
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  function updateFieldSelection(fieldId: FieldType, selected: boolean) {
+    setFieldIds((current) => selected
+      ? current.includes(fieldId) ? current : [...current, fieldId]
+      : current.filter((id) => id !== fieldId))
+    if (selected && soilWork.fertilizerMode === 'perField') {
+      setSoilWork((currentSoilWork) => ({
+        ...currentSoilWork,
+        fieldFertilizers: {
+          ...currentSoilWork.fieldFertilizers,
+          [fieldId]: currentSoilWork.fieldFertilizers[fieldId] ?? {
+            baseFertilizers: [...currentSoilWork.sharedFertilizers.baseFertilizers],
+            topDressings: [...currentSoilWork.sharedFertilizers.topDressings],
+          },
+        },
+      }))
+    }
+  }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const result = create({
@@ -282,10 +350,10 @@ export function NewProjectPage() {
           <div className="space-y-2"><Label htmlFor="project-end">終了日（任意）</Label><Input id="project-end" aria-invalid={!!formErrors.endDate} type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} />{formErrors.endDate && <p className="text-xs text-destructive">{formErrors.endDate}</p>}</div>
         </div>
         <fieldset className="space-y-2"><legend className="text-sm font-medium">使用する畑</legend>
-          <div className="grid gap-2 sm:grid-cols-2">{FIELD_OPTIONS.map((field) => <label key={field.value} className="flex min-h-11 items-center gap-3 rounded-md border px-3"><input type="checkbox" checked={fieldIds.includes(field.value)} onChange={(event) => setFieldIds((ids) => event.target.checked ? [...ids, field.value] : ids.filter((id) => id !== field.value))} className="size-4 accent-primary" />{field.label}</label>)}</div>
+          <div className="grid gap-2 sm:grid-cols-2">{FIELD_OPTIONS.map((field) => <label key={field.value} className="flex min-h-11 items-center gap-3 rounded-md border px-3"><input type="checkbox" checked={fieldIds.includes(field.value)} onChange={(event) => updateFieldSelection(field.value, event.target.checked)} className="size-4 accent-primary" />{field.label}</label>)}</div>
           {formErrors.fieldIds && <p className="text-xs text-destructive">{formErrors.fieldIds}</p>}
         </fieldset>
-        <SoilWorkForm value={soilWork} onChange={setSoilWork} errors={Object.fromEntries(Object.entries(formErrors).filter(([key]) => key.startsWith('soilWork.')).map(([key, value]) => [key.slice('soilWork.'.length), value]))} />
+        <SoilWorkForm value={soilWork} onChange={setSoilWork} fieldIds={fieldIds} errors={Object.fromEntries(Object.entries(formErrors).filter(([key]) => key.startsWith('soilWork.')).map(([key, value]) => [key.slice('soilWork.'.length), value]))} />
         <div className="flex gap-2"><Button type="submit">作成して詳細へ</Button><Button type="button" variant="outline" onClick={() => router.push('/projects')}>キャンセル</Button></div>
       </form>
     </CardContent></Card>
@@ -387,11 +455,11 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       {rowNumber !== null && <><ChevronRight className="size-4 text-muted-foreground" /><span>列{rowNumber}</span></>}
       {selectedPlant && <><ChevronRight className="size-4 text-muted-foreground" /><span>{plantDisplayName(field?.label ?? fieldName(selectedPlant.fieldId), selectedPlant.ridgeNumber, selectedPlant.rowNumber, selectedPlant.plantNumber)}</span></>}
     </nav>
-    <SoilWorkCard soilWork={project.soilWork} onEdit={() => { setSoilWorkDraft({ ...project.soilWork }); setSoilWorkErrors({}); setSoilWorkOpen(true) }} />
+    <SoilWorkCard soilWork={project.soilWork} fieldIds={project.fieldIds} onEdit={() => { setSoilWorkDraft(structuredClone(project.soilWork)); setSoilWorkErrors({}); setSoilWorkOpen(true) }} />
     {soilWorkOpen && soilWorkDraft && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 print:hidden" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSoilWorkOpen(false) }}>
       <section role="dialog" aria-modal="true" aria-labelledby="soil-work-title" className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card p-5 shadow-xl">
         <h2 id="soil-work-title" className="mb-4 text-lg font-bold">土づくりを編集</h2>
-        <SoilWorkForm value={soilWorkDraft} onChange={setSoilWorkDraft} errors={soilWorkErrors} />
+        <SoilWorkForm value={soilWorkDraft} onChange={setSoilWorkDraft} fieldIds={project.fieldIds} errors={soilWorkErrors} />
         <div className="mt-4 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setSoilWorkOpen(false)}>キャンセル</Button><Button type="button" onClick={() => {
           const result = soilWorkSchema.safeParse(soilWorkDraft)
           if (!result.success) return setSoilWorkErrors(Object.fromEntries(result.error.issues.map((issue) => [issue.path.join('.'), issue.message])))

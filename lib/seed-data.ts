@@ -1,8 +1,10 @@
 import type { AppState, CropStatus, Plant, Project, ProjectFieldConfig } from '@/lib/types'
+import { FieldType } from '@/lib/types'
 
 const blankSoilWork = {
-  baseFertilizers: [],
-  topDressings: [],
+  fertilizerMode: 'shared' as const,
+  sharedFertilizers: { baseFertilizers: [], topDressings: [] },
+  fieldFertilizers: {},
   sowing: '',
   sowingDate: '',
   note: '',
@@ -14,10 +16,10 @@ const projects: Project[] = [
     name: '2026年春トマト',
     year: 2026,
     cropName: 'トマト',
-    fieldIds: ['east', 'west'],
+    fieldIds: [FieldType.YAMADA2, FieldType.YAMADA3],
     startDate: '2026-03-15',
     endDate: null,
-    soilWork: { ...blankSoilWork, baseFertilizers: [{ name: '完熟堆肥・有機配合肥料', date: '2026-03-08', amount: '畝全体に施用', note: '' }], sowing: 'トマト苗', sowingDate: '2026-03-15' },
+    soilWork: { ...blankSoilWork, sharedFertilizers: { ...blankSoilWork.sharedFertilizers, baseFertilizers: [{ name: '完熟堆肥・有機配合肥料', date: '2026-03-08', amount: '畝全体に施用', note: '' }] }, sowing: 'トマト苗', sowingDate: '2026-03-15' },
     createdAt: '2026-03-01T09:00:00.000Z',
   },
   {
@@ -25,10 +27,10 @@ const projects: Project[] = [
     name: '2026年秋レタス',
     year: 2026,
     cropName: 'レタス',
-    fieldIds: ['north'],
+    fieldIds: [FieldType.IKENOUCHI1],
     startDate: '2026-08-20',
     endDate: null,
-    soilWork: { ...blankSoilWork, baseFertilizers: [{ name: '完熟堆肥・有機肥料', date: '2026-08-10', amount: '', note: '' }] },
+    soilWork: { ...blankSoilWork, sharedFertilizers: { ...blankSoilWork.sharedFertilizers, baseFertilizers: [{ name: '完熟堆肥・有機肥料', date: '2026-08-10', amount: '', note: '' }] } },
     createdAt: '2026-08-01T09:00:00.000Z',
   },
   {
@@ -36,19 +38,19 @@ const projects: Project[] = [
     name: '2025年夏キュウリ',
     year: 2025,
     cropName: 'キュウリ',
-    fieldIds: ['east'],
+    fieldIds: [FieldType.YAMADA2],
     startDate: '2025-04-10',
     endDate: '2025-09-25',
-    soilWork: { ...blankSoilWork, baseFertilizers: [{ name: '完熟堆肥・有機肥料', date: '2025-04-05', amount: '', note: '' }] },
+    soilWork: { ...blankSoilWork, sharedFertilizers: { ...blankSoilWork.sharedFertilizers, baseFertilizers: [{ name: '完熟堆肥・有機肥料', date: '2025-04-05', amount: '', note: '' }] } },
     createdAt: '2025-04-01T09:00:00.000Z',
   },
 ]
 
 const projectFieldConfigs: ProjectFieldConfig[] = [
-  { id: 'config-tomato-east', projectId: 'project-tomato-2026', fieldId: 'east', ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
-  { id: 'config-tomato-west', projectId: 'project-tomato-2026', fieldId: 'west', ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 6 },
-  { id: 'config-lettuce-north', projectId: 'project-lettuce-2026', fieldId: 'north', ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
-  { id: 'config-cucumber-east', projectId: 'project-cucumber-2025', fieldId: 'east', ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 5 },
+  { id: 'config-tomato-east', projectId: 'project-tomato-2026', fieldId: FieldType.YAMADA2, ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
+  { id: 'config-tomato-west', projectId: 'project-tomato-2026', fieldId: FieldType.YAMADA3, ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 6 },
+  { id: 'config-lettuce-north', projectId: 'project-lettuce-2026', fieldId: FieldType.IKENOUCHI1, ridgeCount: 3, rowCountPerRidge: 2, plantCountPerRow: 8 },
+  { id: 'config-cucumber-east', projectId: 'project-cucumber-2025', fieldId: FieldType.YAMADA2, ridgeCount: 2, rowCountPerRidge: 2, plantCountPerRow: 5 },
 ]
 
 function initialStatus(projectId: string, ridge: number, row: number, number: number): CropStatus {

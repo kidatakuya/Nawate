@@ -1,3 +1,5 @@
+import { textMap } from '@/constants/fields'
+import { FieldType } from '@/lib/types'
 import { calculateCapacity, formatDate, generateId, getFieldLabel, todayString } from '@/lib/utils'
 
 describe('utility functions', () => {
@@ -18,6 +20,7 @@ describe('utility functions', () => {
   })
 
   it('returns the configured field label', () => {
-    expect(getFieldLabel('north')).toBe('北の畑')
+    expect(getFieldLabel(FieldType.IKENOUCHI1)).toBe(textMap[FieldType.IKENOUCHI1])
+    expect(textMap[FieldType.YAMADA2]).toBe('山田2')
   })
 })

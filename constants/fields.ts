@@ -1,12 +1,17 @@
-import type { FieldType } from '@/lib/types'
+import { FieldType } from "@/lib/types";
+
+export const textMap: Record<FieldType, string> = {
+  [FieldType.YAMADA2]: "山田2",
+  [FieldType.YAMADA3]: "山田3",
+  [FieldType.IKENOUCHI1]: "池之内1",
+};
 
 export const FIELD_OPTIONS: { value: FieldType; label: string }[] = [
-  { value: 'east', label: '東の畑' },
-  { value: 'west', label: '西の畑' },
-  { value: 'north', label: '北の畑' },
-  { value: 'south', label: '南の畑' },
-]
+  { value: FieldType.YAMADA2, label: textMap[FieldType.YAMADA2] },
+  { value: FieldType.YAMADA3, label: textMap[FieldType.YAMADA3] },
+  { value: FieldType.IKENOUCHI1, label: textMap[FieldType.IKENOUCHI1] },
+];
 
 export function fieldLabel(fieldId: FieldType): string {
-  return FIELD_OPTIONS.find((field) => field.value === fieldId)?.label ?? fieldId
+  return textMap[fieldId];
 }

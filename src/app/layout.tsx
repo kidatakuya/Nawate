@@ -1,6 +1,8 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
+import { Suspense } from "react";
+import { RouteLoadingIndicator } from "@/components/farm/route-loading-indicator";
 import "./globals.css";
 
 const notoSansJp = Noto_Sans_JP({
@@ -46,6 +48,9 @@ export default function RootLayout({
   return (
     <html lang="ja" className={notoSansJp.variable}>
       <body className="min-h-dvh antialiased">
+        <Suspense fallback={null}>
+          <RouteLoadingIndicator />
+        </Suspense>
         {children}
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
